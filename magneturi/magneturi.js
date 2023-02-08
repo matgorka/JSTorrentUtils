@@ -1,12 +1,23 @@
 const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
 
-const parseAddress = inputUrl => {
-  let url = new URL(inputUrl).href;
+const parseAddress = addr => {
+  let protocol,
+      rest,
+      urlData,
+      interAddr; /* internationalized address */
 
-  if (!inputUrl.endsWith("/"))
-    url = url.replace(/\/$/, "");
+  [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
+  urlData          = new URL("http://" + rest);
 
-  return url;
+  if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
+    throw new Error();
+
+  interAddr = protocol + urlData.href.slice(7);
+
+  if (!addr.endsWith("/"))
+    interAddr = interAddr.replace(/\/$/, "");
+
+  return interAddr;
 };
 
 const set = (o, key, value) => {
@@ -118,7 +129,7 @@ const set = (o, key, value) => {
     case "x.pe":
       /* checking if port is given - it is neccessary */
       try {
-        value = parseAddress("https://" + value).slice(8)
+        value = parseAddress("http://" + value).slice(7);
         host  = /(.*):\d+$/.exec(value)[1];
       } catch(err) {
         return;
@@ -186,6 +197,8 @@ const set = (o, key, value) => {
 };
 
 function MagnetURI(uri) {
+  this.params = {};
+
   try {
     /^magnet\:\?(.*)/.exec(uri)[1]
       .split("&")
@@ -195,5 +208,3 @@ function MagnetURI(uri) {
     throw new Error("Invalid magnet uri.");
   }
 }
-
-var x={};
