@@ -1,4 +1,4 @@
-const xt = uri => /^urn:([A-Z0-9]+(?::+[A-Z0-9]+)*:*):/i.exec(uri)[1];
+const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
 
 const set = (o, key, value) => {
   let usedProtocols = [], // for xt
@@ -10,6 +10,8 @@ const set = (o, key, value) => {
       r,                  // for so
       i;
 
+  value = decodeURIComponent(value);
+
   try {
     switch (key) {
       /* non-repeatable parameters */
@@ -19,7 +21,7 @@ const set = (o, key, value) => {
         /* BREAK THROUGH */
 
       case "dn":
-        o[key] = [ value + "" ];
+        o[key] = [ value ];
         return;
 
       /* repeatable parameters combinable into single ones */
@@ -82,6 +84,62 @@ const set = (o, key, value) => {
           o.xt[i] = value;
           return;
         }
+
+        break;
+
+      /* repeatable address parameters */
+      case "x.pe":
+        /* IPv4 support */
+        if (/^\d+(\.\d+){3}:\d+$/.exec(value)) {
+          for (byte of value.split(":").shift().split("."))
+            if (byte > 255)
+              return;
+        } else {
+          /* IPv6 support */
+          try {
+            ip = /^\[([\dA-F:]+)\]:\d+$/i.exec(value)[1];
+            n  = [...ip.matchAll(/:/g)].length;
+
+            if (
+              (!/::/.exec(ip) && n != 7) ||
+              /*n < 2 ||*/ n > 7 || /::.*::|:::/.exec(ip)
+            ) {
+              return;
+            }
+
+            for (segment of ip.split(":")) {
+              if (segment.length > 4)
+                return;
+            }
+          } catch(err) {
+            /* hostname */
+            try {
+              hostname = /^([A-Z\d](?:[A-Z\d-]*[A-Z\d])?(?:\.[A-Z\d](?:[A-Z\d-]*[A-Z\d])?)*):\d+$/i.exec(value)[1];
+
+              if (!/[A-Z]/i.exec(hostname.split(".").pop()))
+                return;
+            } catch(err) {
+              return;
+            }
+          }
+        }
+
+        console.log(value);
+        return;
+        break;
+
+      case "tr":
+      case "ws":
+      case "as":
+      case "xs":
+        try {
+          new URL(value);
+        } catch(err) {
+          return;
+        }
+
+        if (o[key].includes(value))
+          return;
 
         break;
     }
