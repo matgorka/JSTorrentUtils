@@ -1,5 +1,14 @@
 const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
 
+const parseAddress = inputUrl => {
+  let url = new URL(inputUrl).href;
+
+  if (!inputUrl.endsWith("/"))
+    url = url.replace(/\/$/, "");
+
+  return url;
+};
+
 const set = (o, key, value) => {
   let usedProtocols = [], // for xt
       protocol,           // for xt
@@ -10,7 +19,6 @@ const set = (o, key, value) => {
       r,                  // for so
       host,               // for x.pe
       byte,               // for x.pe
-      addr,               // for tr, ws, as, xs
       i;
 
   value = decodeURIComponent(value);
@@ -42,7 +50,7 @@ const set = (o, key, value) => {
         o.so = [ "" ];
 
       for (range of (o.so[0] + "," + value).split(",")) {
-        if (!range || !/^\d+(?:-\d+)?$/.exec(range))
+        if (!range || !/^\d+(?:-\d+)?$/.test(range))
           continue;
 
         range = range.split("-");
@@ -98,13 +106,14 @@ const set = (o, key, value) => {
     case "x.pe":
       /* checking if port is given - it is neccessary */
       try {
-        host = /(.*):\d+$/.exec(value)[1];
+        value = parseAddress("https://" + value).slice(8)
+        host  = /(.*):\d+$/.exec(value)[1];
       } catch(err) {
         return;
       }
 
       /* IPv4 support */
-      if (/^\d+(\.\d+){3}$/.exec(host)) {
+      if (/^\d+(\.\d+){3}$/.test(host)) {
         for (byte of host.split("."))
           if (byte > 255)
             return;
@@ -115,8 +124,8 @@ const set = (o, key, value) => {
           n  = [...ip.matchAll(/:/g)].length;
 
           if (
-            (!/::/.exec(ip) && n != 7) ||
-            /*n < 2 ||*/ n > 7 || /::.*::|:::/.exec(ip)
+            (!/::/.test(ip) && n != 7) ||
+            /*n < 2 ||*/ n > 7 || /::.*::|:::/.test(ip)
           ) {
             return;
           }
@@ -125,18 +134,21 @@ const set = (o, key, value) => {
             if (segment.length > 4)
               return;
           }
+
+          return;
         } catch(err) {
           /* hostname */
-          if (!/^[A-Z\d]([A-Z\d-]*[A-Z\d])?(\.[A-Z\d]([A-Z\d-]*[A-Z\d])?)*$/i.exec(host))
+          if (!/^[A-Z\d]([A-Z\d-]*[A-Z\d])?(\.[A-Z\d]([A-Z\d-]*[A-Z\d])?)*$/i.test(host))
             return;
 
-          if (!/[A-Z-]/i.exec(host.split(".").pop()))
+          if (!/[A-Z-]/i.test(host.split(".").pop()))
             return;
         }
       }
 
-      console.log(value);
-      return;
+      if (o[key] && o[key].includes(value))
+        return;
+
       break;
 
     case "tr":
@@ -144,18 +156,14 @@ const set = (o, key, value) => {
     case "as":
     case "xs":
       try {
-        addr = new URL(value).href;
-
-        if (!value.endsWith("/"))
-          addr = addr.replace(/\/$/, "");
+        value = parseAddress(value);
       } catch(err) {
-        return err;
+        return;
       }
 
-      if (o[key] && o[key].includes(addr))
+      if (o[key] && o[key].includes(value))
         return;
 
-      value = addr;
       break;
   }
 
