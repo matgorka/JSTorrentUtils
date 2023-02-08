@@ -21,6 +21,18 @@ const set = (o, key, value) => {
       byte,               // for x.pe
       i;
 
+  try {
+    key = key.toLowerCase();
+
+    if (typeof value == "object")
+      value = value.valueOf();
+  } catch(err) {
+    return;
+  }
+
+  if (!["number", "string"].includes(typeof value) || value === "")
+    return;
+
   value = decodeURIComponent(value);
 
   switch (key) {
@@ -40,7 +52,7 @@ const set = (o, key, value) => {
         o.kt = [ "" ];
 
       o.kt = [
-        [...new Set((o.kt[0] + "+" + value).split(/[\+\s]+/))]
+        [...new Set((o.kt[0] + "+" + value.toLowerCase()).split(/[\+\s]+/))]
           .join("+").replace(/^\+|\+$/g, "")
       ];
       return;
