@@ -1,28 +1,39 @@
-const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
+const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
 
-const parseAddress = addr => {
+const parseAddress = (validate, param, addr, isSimpleAddr) => {
   let protocol,
       rest,
       urlData,
       interAddr; /* internationalized address */
 
+  if (isSimpleAddr)
+    addr = "http://" + addr;
+
   [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
   urlData          = new URL("http://" + rest);
 
-  if (["udp://", "tcp://"]].includes(protocol) && urlData.port === "")
+  if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
     throw new Error();
+
+  if (isSimpleAddr)
+    protocol = "";
 
   interAddr = protocol + urlData.href.slice(7);
 
   if (!addr.endsWith("/"))
     interAddr = interAddr.replace(/\/$/, "");
 
+  if (!validate(param, protocol))
+    throw new Error();
+
   return interAddr;
 };
 
-const set = (o, key, value) => {
+const set = (validate, o, key, value) => {
   let usedProtocols = [], // for xt
       protocol,           // for xt
+      hash,               // for xt
+      newSelections,      // for so
       bitfield      = [], // for so
       arr           = [], // for so
       range,              // for so
@@ -57,6 +68,9 @@ const set = (o, key, value) => {
       /* BREAK THROUGH */
 
     case "dn":
+      if (!validate(key, value))
+        return;
+
       o[key] = [ value ];
       return;
 
@@ -65,9 +79,19 @@ const set = (o, key, value) => {
       if (!o.kt)
         o.kt = [ "" ];
 
+      value    = value.toLowerCase();
+      /* all keywords - old and new */
+      keywords = o.kt[0] + "+" + value;
+      /* fixing doubled '+' characters and repeating keywords */
+      keywords = [...new Set(keywords.split(/[\+\s]+/))].filter(k => k !== "")
+      /* getting the new keywords */
+        .filter(keyword => !o.kt[0].split("+").includes(keyword))
+      /* and validating them */
+        .filter(keyword => validate(key, keyword));
+
+      /* adding new keywords to the list */
       o.kt = [
-        [...new Set((o.kt[0] + "+" + value.toLowerCase()).split(/[\+\s]+/))]
-          .join("+").replace(/^\+|\+$/g, "")
+        o.kt[0].split("+").concat(keywords).join("+").replace(/^\+/, "")
       ];
       return;
 
@@ -75,7 +99,9 @@ const set = (o, key, value) => {
       if (!o.so)
         o.so = [ "" ];
 
-      for (range of (o.so[0] + "," + value).split(",")) {
+      value = o.so[0] + "," + value;
+
+      for (range of value.split(",")) {
         if (!range || !/^\d+(?:-\d+)?$/.test(range))
           continue;
 
@@ -103,6 +129,9 @@ const set = (o, key, value) => {
         }
       }
 
+      if (!validate(key, arr.join()))
+        return;
+
       o.so = [ arr.join() ];
       return;
 
@@ -114,10 +143,13 @@ const set = (o, key, value) => {
       }
 
       try {
-        protocol = xt(value);
+        [protocol, hash] = xt(value);
       } catch(err) {
         return;
       }
+
+      if (!validate(key, [protocol, hash]))
+        return;
 
       i = usedProtocols.indexOf(protocol);
 
@@ -132,7 +164,7 @@ const set = (o, key, value) => {
     case "x.pe":
       /* checking if port is given - it is neccessary */
       try {
-        value = parseAddress("http://" + value).slice(7);
+        value = parseAddress(validate, key, value, true);
         host  = /(.*):\d+$/.exec(value)[1];
       } catch(err) {
         return;
@@ -191,7 +223,7 @@ const set = (o, key, value) => {
     case "as":
     case "xs":
       try {
-        value = parseAddress(value);
+        value = parseAddress(validate, key, value);
       } catch(err) {
         return;
       }
@@ -200,6 +232,10 @@ const set = (o, key, value) => {
         return;
 
       break;
+
+    default:
+      if (!validate(key, value))
+        return;
   }
 
   if (o[key])
@@ -209,21 +245,15 @@ const set = (o, key, value) => {
 };
 
 function MagnetURI(uri) {
-  this.params = {};
+  this._params   = {};
+  this._validate = () => 1;
 
   try {
     /^magnet\:\?(.*)/.exec(uri)[1]
       .split("&")
       .map(param => param.split("=").map(x => decodeURIComponent(x)))
-      .forEach(([key, value]) => set(this.params, key, value));
+      .forEach(([key, value]) => set(this._validate, this._params, key, value));
   } catch(err) {
     throw new Error("Invalid magnet uri.");
   }
-}
-
-var x={};
-
-function test(p, v) {
-  set(x, p, v);
-  console.log(JSON.stringify(x));
 }
