@@ -1,3 +1,5 @@
+const protocols  = ["wss", "ws", "https", "http", "udp", "tcp"].map(x => x + "://");
+const tProtocols = protocols.slice(4);
 const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
 
 const parseAddress = addr => {
@@ -9,7 +11,7 @@ const parseAddress = addr => {
   [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
   urlData          = new URL("http://" + rest);
 
-  if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
+  if (!protocols.includes(protocol) || (tProtocols.includes(protocol) && urlData.port === ""))
     throw new Error();
 
   interAddr = protocol + urlData.href.slice(7);
@@ -26,8 +28,11 @@ const set = (o, key, value) => {
       bitfield      = [], // for so
       arr           = [], // for so
       range,              // for so
-      l,                  // for so
-      r,                  // for so
+      l,                  // for so and x.pe
+      r,                  // for so and x.pe
+      ip,                 // for x.pe
+      segments,           // for x.pe
+      err,                // for x.pe
       host,               // for x.pe
       byte,               // for x.pe
       i;
@@ -143,22 +148,31 @@ const set = (o, key, value) => {
       } else {
         /* IPv6 support */
         try {
-          ip = /^\[([\dA-F:]+)\]$/i.exec(host)[1];
-          n  = [...ip.matchAll(/:/g)].length;
+          ip          = /^\[([\dA-F:]+)\]$/i.exec(host)[1];
+          [l, r, err] = ip.split("::");
 
-          if (
-            (!/::/.test(ip) && n != 7) ||
-            /*n < 2 ||*/ n > 7 || /::.*::|:::/.test(ip)
-          ) {
+          if (err || /:::/.test(ip))
             return;
+
+          segments = l.split(":");
+
+          if (r !== undefined) {
+            r = r.split(":");
+
+            segments = segments
+              .concat(new Array(8 - segments.length - r.length).fill(0), r);
           }
 
-          for (segment of ip.split(":")) {
-            if (segment.length > 4)
+          if (segments.length < 8)
+            return;
+
+          for (i in segments) {
+            if (segments[i] == "")
+              segments[i] = 0;
+
+            if (segments[i].length > 4)
               return;
           }
-
-          return;
         } catch(err) {
           /* hostname */
           if (!/^[A-Z\d]([A-Z\d-]*[A-Z\d])?(\.[A-Z\d]([A-Z\d-]*[A-Z\d])?)*$/i.test(host))
@@ -207,4 +221,11 @@ function MagnetURI(uri) {
   } catch(err) {
     throw new Error("Invalid magnet uri.");
   }
+}
+
+var x={};
+
+function test(p, v) {
+  set(x, p, v);
+  console.log(JSON.stringify(x));
 }
