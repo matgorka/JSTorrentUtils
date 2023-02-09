@@ -1,5 +1,3 @@
-const protocols  = ["wss", "ws", "https", "http", "udp", "tcp"].map(x => x + "://");
-const tProtocols = protocols.slice(4);
 const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):/i.exec(uri)[1];
 
 const parseAddress = addr => {
@@ -11,7 +9,7 @@ const parseAddress = addr => {
   [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
   urlData          = new URL("http://" + rest);
 
-  if (!protocols.includes(protocol) || (tProtocols.includes(protocol) && urlData.port === ""))
+  if (["udp://", "tcp://"]].includes(protocol) && urlData.port === "")
     throw new Error();
 
   interAddr = protocol + urlData.href.slice(7);
