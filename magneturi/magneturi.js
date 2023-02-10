@@ -1,4 +1,5 @@
-const xt = uri => /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
+const parseXT = uri =>
+  /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
 
 const parseAddress = (validate, param, addr, isSimpleAddr) => {
   let protocol,
@@ -29,14 +30,49 @@ const parseAddress = (validate, param, addr, isSimpleAddr) => {
   return interAddr;
 };
 
+const interpretRange = (rangeStr, bitfield, booleanValue, arr) => {
+  let range,
+      l,
+      r,
+      i;
+
+  arr.splice(0, arr.length);
+
+  for (range of rangeStr.split(",")) {
+    if (!range || !/^\d+(-\d+)?$/.test(range))
+      continue;
+
+    range = range.split("-");
+    l     = range[0] * 1;
+    r     = range[1] || range[0];
+
+    if (l > r)
+      [r, l] = [l, r];
+
+    for (i = l; i <= Math.min(r, 1e6); ++i)
+      bitfield[i] = booleanValue;
+  }
+
+  for (l = -1, r = 0; r <= bitfield.length; ++r) {
+    if (bitfield[r]) {
+      if (l < 0)
+        l = r;
+    } else if (l >= 0) {
+      if (r - l > 1)
+        l += "-" + (r - 1);
+
+      arr.push(l);
+      l = -1;
+    }
+  }
+}
+
 const set = (validate, o, key, value) => {
   let usedProtocols = [], // for xt
       protocol,           // for xt
       hash,               // for xt
-      newSelections,      // for so
       bitfield      = [], // for so
       arr           = [], // for so
-      range,              // for so
       l,                  // for so and x.pe
       r,                  // for so and x.pe
       ip,                 // for x.pe
@@ -99,41 +135,9 @@ const set = (validate, o, key, value) => {
       if (!o.so)
         o.so = [ "" ];
 
-      const interpretRange = (rangeStr, bitfield, booleanValue) => {
-        arr = [];
-
-        for (range of rangeStr.split(",")) {
-          if (!range || !/^\d+(-\d+)?$/.test(range))
-            continue;
-
-          range = range.split("-");
-          l     = range[0] * 1;
-          r     = range[1] || range[0];
-
-          if (l > r)
-            [r, l] = [l, r];
-
-          for (i = l; i <= Math.min(r, 1e6); ++i)
-            bitfield[i] = booleanValue;
-        }
-
-        for (l = -1, r = 0; r <= bitfield.length; ++r) {
-          if (bitfield[r]) {
-            if (l < 0)
-              l = r;
-          } else if (l >= 0) {
-            if (r - l > 1)
-              l += "-" + (r - 1);
-
-            arr.push(l);
-            l = -1;
-          }
-        }
-      }
-
-      interpretRange(o.so[0] + "," + value, bitfield, 1);
+      interpretRange(o.so[0] + "," + value, bitfield, 1, arr);
       value = arr.join();
-      interpretRange(o.so[0], bitfield, 0);
+      interpretRange(o.so[0], bitfield, 0, arr);
 
       if (arr.length && !validate(key, arr.join()))
         return;
@@ -144,12 +148,12 @@ const set = (validate, o, key, value) => {
     /* repeatable but once per protocol: xt parameter */
     case "xt":
       try {
-        usedProtocols = o.xt.map(uri => xt(uri))
+        usedProtocols = o.xt.map(uri => parseXT(uri))
       } catch(err) {
       }
 
       try {
-        [protocol, hash] = xt(value);
+        [protocol, hash] = parseXT(value);
       } catch(err) {
         return;
       }
