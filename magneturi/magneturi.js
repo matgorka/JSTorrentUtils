@@ -99,40 +99,46 @@ const set = (validate, o, key, value) => {
       if (!o.so)
         o.so = [ "" ];
 
-      value = o.so[0] + "," + value;
+      const interpretRange = (rangeStr, bitfield, booleanValue) => {
+        arr = [];
 
-      for (range of value.split(",")) {
-        if (!range || !/^\d+(?:-\d+)?$/.test(range))
-          continue;
+        for (range of rangeStr.split(",")) {
+          if (!range || !/^\d+(-\d+)?$/.test(range))
+            continue;
 
-        range = range.split("-");
-        l     = range[0] * 1;
-        r     = range[1] || range[0];
+          range = range.split("-");
+          l     = range[0] * 1;
+          r     = range[1] || range[0];
 
-        if (l > r)
-          [r, l] = [l, r];
+          if (l > r)
+            [r, l] = [l, r];
 
-        for (i = l; i <= Math.min(r, 1e6); ++i)
-          bitfield[i] = 1;
-      }
+          for (i = l; i <= Math.min(r, 1e6); ++i)
+            bitfield[i] = booleanValue;
+        }
 
-      for (l = -1, r = 0; r <= bitfield.length; ++r) {
-        if (bitfield[r]) {
-          if (l < 0)
-            l = r;
-        } else if (l >= 0) {
-          if (r - l > 1)
-            l += "-" + (r - 1);
+        for (l = -1, r = 0; r <= bitfield.length; ++r) {
+          if (bitfield[r]) {
+            if (l < 0)
+              l = r;
+          } else if (l >= 0) {
+            if (r - l > 1)
+              l += "-" + (r - 1);
 
-          arr.push(l);
-          l = -1;
+            arr.push(l);
+            l = -1;
+          }
         }
       }
 
-      if (!validate(key, arr.join()))
+      interpretRange(o.so[0] + "," + value, bitfield, 1);
+      value = arr.join();
+      interpretRange(o.so[0], bitfield, 0);
+
+      if (arr.length && !validate(key, arr.join()))
         return;
 
-      o.so = [ arr.join() ];
+      o.so = [ value ];
       return;
 
     /* repeatable but once per protocol: xt parameter */
