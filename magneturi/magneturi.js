@@ -258,12 +258,18 @@ const set = (validate, o, key, value) => {
     o[key] = [ value ];
 };
 
-function MagnetURI(uri) {
+function MagnetURI(data) {
   this._params   = {};
   this._validate = () => 1;
 
+  if (!data)
+    return;
+
   try {
-    this.add(/^magnet\:\?(.*)/.exec(uri)[1]);
+    if (typeof data == "string")
+      this.add(/^magnet\:\?(.*)/.exec(data)[1]);
+    else
+      this.add(data);
   } catch(err) {
     throw new Error("Invalid magnet uri.");
   }
@@ -282,6 +288,9 @@ Object.assign(MagnetURI.prototype, {
   },
 
   add: function(param, value) {
+    if (!param)
+      return;
+
     if (typeof param == "string") {
       if (typeof value != "string") {
         if (Array.isArray(value)) {
@@ -291,11 +300,14 @@ Object.assign(MagnetURI.prototype, {
           return;
         }
 
-        param.split("&")
-          .map(param => param.split("="))
-          .forEach(([key, value]) => this.add(key, value));
+        if (!value) {
+          param = param.split("&").map(param => param.split("="));
 
-        return;
+          for ([param, value] of param)
+            this.add(param, value);
+
+          return;
+        }
       }
 
       set(this._validate, this._params, param, value);
@@ -303,8 +315,8 @@ Object.assign(MagnetURI.prototype, {
     }
 
     if (Array.isArray(param)) {
-      for ([key, value] of param)
-        this.add(key, value);
+      for ([param, value] of param)
+        this.add(param, value);
 
       return;
     }
