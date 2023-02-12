@@ -263,11 +263,113 @@ function MagnetURI(uri) {
   this._validate = () => 1;
 
   try {
-    /^magnet\:\?(.*)/.exec(uri)[1]
-      .split("&")
-      .map(param => param.split("=").map(x => decodeURIComponent(x)))
-      .forEach(([key, value]) => set(this._validate, this._params, key, value));
+    this.add(/^magnet\:\?(.*)/.exec(uri)[1]);
   } catch(err) {
     throw new Error("Invalid magnet uri.");
   }
 }
+
+const paramsList = [
+  "xt", "dn", "xl", "kt", "so", "tr", "xs", "as", "ws", "x.pe"
+];
+
+Object.assign(MagnetURI.prototype, {
+  get: function(param) {
+    if (!param)
+      return this._params;
+
+    return this._params[param];
+  },
+
+  add: function(param, value) {
+    if (typeof param == "string") {
+      if (typeof value != "string") {
+        if (Array.isArray(value)) {
+          for (value of value)
+            this.add(param, value);
+
+          return;
+        }
+
+        param.split("&")
+          .map(param => param.split("="))
+          .forEach(([key, value]) => this.add(key, value));
+
+        return;
+      }
+
+      set(this._validate, this._params, param, value);
+      return;
+    }
+
+    if (Array.isArray(param)) {
+      for ([key, value] of param)
+        this.add(key, value);
+
+      return;
+    }
+
+    if (typeof param != "object")
+      return;
+
+    this.add(Object.entries(param));
+  },
+
+  set: function(param, value) {
+    // TO DO!
+  },
+
+  toString: function() {
+    const append = (key, fn) => {
+      try {
+        str += `&${key}=` + fn(this._params[key][0]);
+      } catch(err) {
+      }
+    };
+
+    const pass = value => value;
+
+    let str = "",
+        key,
+        value,
+        values,
+        params;
+
+    try {
+      this._params.xt.forEach(xt => str += "&xt=" + xt);
+    } catch(err) {
+      throw new Error("Invalid magnet uri.");
+    }
+
+    str = "magnet:?" + str.slice(1);
+    append("dn", encodeURIComponent);
+    append("xl", pass);
+    append("kt", pass);
+    append("so", pass);
+
+    for (key of ["tr", "xs", "as", "ws"]) {
+      if (!this._params[key])
+        continue;
+
+      for (value of this._params[key])
+        str += `&${key}=` + encodeURIComponent(value);
+    }
+
+    if (this._params["x.pe"])
+      for (value of this._params["x.pe"])
+        str += `&x.pe=` + value;
+
+    params = Object.entries(this._params)
+      .filter(([key]) => !paramsList.includes(key));
+
+    for ([key, values] of params)
+      for (value of values)
+        str += `&${key}=` + value;
+
+    return str;
+  },
+
+  valueOf: function() {
+    return this.toString();
+  }
+});
