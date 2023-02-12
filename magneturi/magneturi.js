@@ -1,7 +1,7 @@
 const parseXT = uri =>
   /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
 
-const parseAddress = (validate, param, addr, isSimpleAddr) => {
+const parseAddress = (param, addr, isSimpleAddr) => {
   let protocol,
       rest,
       urlData,
@@ -24,13 +24,10 @@ const parseAddress = (validate, param, addr, isSimpleAddr) => {
   if (!addr.endsWith("/"))
     interAddr = interAddr.replace(/\/$/, "");
 
-  if (!validate(param, protocol))
-    throw new Error();
-
-  return interAddr;
+  return [ interAddr, protocol ];
 };
 
-const interpretRange = (rangeStr, bitfield, booleanValue, arr) => {
+const parseRange = (rangeStr, bitfield, booleanValue, arr) => {
   let range,
       l,
       r,
@@ -65,16 +62,16 @@ const interpretRange = (rangeStr, bitfield, booleanValue, arr) => {
       l = -1;
     }
   }
-}
+};
 
 const set = (validate, o, key, value) => {
   let usedProtocols = [], // for xt
-      protocol,           // for xt
+      protocol,           // for xt/x.pe/tr/ws/as/xs
       hash,               // for xt
       bitfield      = [], // for so
       arr           = [], // for so
-      l,                  // for so and x.pe
-      r,                  // for so and x.pe
+      l,                  // for x.pe
+      r,                  // for x.pe
       ip,                 // for x.pe
       segments,           // for x.pe
       err,                // for x.pe
@@ -94,7 +91,8 @@ const set = (validate, o, key, value) => {
   if (!["number", "string"].includes(typeof value) || value === "")
     return;
 
-  value = decodeURIComponent(value);
+  if (key != "kt")
+    value = decodeURIComponent(value);
 
   switch (key) {
     /* non-repeatable parameters */
@@ -135,9 +133,9 @@ const set = (validate, o, key, value) => {
       if (!o.so)
         o.so = [ "" ];
 
-      interpretRange(o.so[0] + "," + value, bitfield, 1, arr);
+      parseRange(o.so[0] + "," + value, bitfield, 1, arr);
       value = arr.join();
-      interpretRange(o.so[0], bitfield, 0, arr);
+      parseRange(o.so[0], bitfield, 0, arr);
 
       if (arr.length && !validate(key, arr.join()))
         return;
@@ -174,8 +172,8 @@ const set = (validate, o, key, value) => {
     case "x.pe":
       /* checking if port is given - it is neccessary */
       try {
-        value = parseAddress(validate, key, value, true);
-        host  = /(.*):\d+$/.exec(value)[1];
+        [value, protocol] = parseAddress(key, value, true);
+        host              = /(.*):\d+$/.exec(value)[1];
       } catch(err) {
         return;
       }
@@ -223,6 +221,9 @@ const set = (validate, o, key, value) => {
         }
       }
 
+      if (!validate(key, value))
+        return;
+
       if (o[key] && o[key].includes(value))
         return;
 
@@ -233,10 +234,13 @@ const set = (validate, o, key, value) => {
     case "as":
     case "xs":
       try {
-        value = parseAddress(validate, key, value);
+        [value, protocol] = parseAddress(key, value);
       } catch(err) {
         return;
       }
+
+      if (!validate(key, protocol))
+        return;
 
       if (o[key] && o[key].includes(value))
         return;
