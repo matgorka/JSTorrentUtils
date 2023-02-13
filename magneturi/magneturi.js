@@ -5,23 +5,29 @@ const parseAddress = (param, addr, isSimpleAddr) => {
   let protocol,
       rest,
       urlData,
-      port,
-      interAddr; /* internationalized address */
+      urlData2,
+      sliceI     = 7,
+      interAddr;      /* internationalized address */
 
   if (isSimpleAddr)
     addr = "http://" + addr;
 
   [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
   urlData          = new URL("http://" + rest);
-  port             = urlData.port || new URL("https://" + rest).port;
+  urlData2         = new URL("https://" + rest);
 
-  if (["udp://", "tcp://"].includes(protocol) && port === "")
+  if (!urlData.port && urlData2.port) {
+    urlData = urlData2;
+    sliceI  = 8;
+  }
+
+  if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
     throw new Error();
 
   if (isSimpleAddr)
     protocol = "";
 
-  interAddr = protocol + urlData.href.slice(7);
+  interAddr = protocol + urlData.href.slice(sliceI);
 
   if (!addr.endsWith("/"))
     interAddr = interAddr.replace(/\/$/, "");
