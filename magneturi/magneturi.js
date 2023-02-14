@@ -1,3 +1,7 @@
+const paramsList = [
+  "xt", "dn", "xl", "kt", "so", "tr", "xs", "as", "ws", "x.pe"
+];
+
 const parseXT = uri =>
   /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
 
@@ -33,6 +37,72 @@ const getIDNAddress = (addr, hasNoProtocol) => {
     idnAddr = idnAddr.replace(/\/$/, "");
 
   return [ idnAddr, protocol ];
+};
+
+const parseXPE = value => {
+  let protocol,
+      l,
+      r,
+      ip,
+      segments,
+      err,
+      host,
+      byte;
+
+  /* converting to IDN + checking if port is given (it is neccessary) */
+  try {
+    [value, protocol] = getIDNAddress(value, true);
+    host              = /(.*):\d+$/.exec(value)[1];
+  } catch(err) {
+    return;
+  }
+
+  /* IPv4 support */
+  if (/^\d+(\.\d+){3}$/.test(host)) {
+    for (byte of host.split("."))
+      if (byte > 255)
+        return;
+
+    return value;
+  }
+
+  /* IPv6 support */
+  try {
+    ip          = /^\[([\dA-F:]+)\]$/i.exec(host)[1];
+    [l, r, err] = ip.split("::");
+
+    if (err || /:::/.test(ip))
+      return;
+
+    segments = l.split(":");
+
+    if (r !== undefined) {
+      r = r.split(":");
+
+      segments = segments
+        .concat(new Array(8 - segments.length - r.length).fill(0), r);
+    }
+
+    if (segments.length < 8)
+      return;
+
+    for (i in segments) {
+      if (segments[i] == "")
+        segments[i] = 0;
+
+      if (segments[i].length > 4)
+        return;
+    }
+  } catch(err) {
+    /* hostname */
+    if (!/^[A-Z\d]([A-Z\d-]*[A-Z\d])?(\.[A-Z\d]([A-Z\d-]*[A-Z\d])?)*$/i.test(host))
+      return;
+
+    if (!/[A-Z-]/i.test(host.split(".").pop()))
+      return;
+  }
+
+  return value;
 };
 
 const parseRange = (rangeStr, bitfield, booleanValue, arr) => {
@@ -72,19 +142,43 @@ const parseRange = (rangeStr, bitfield, booleanValue, arr) => {
   }
 };
 
-const set = (validate, o, key, value) => {
+const parseSO = (oldRange, newRange) => {
+  let bitfield = [],
+      arr      = [];
+
+  parseRange(oldRange + "," + newRange, bitfield, 1, arr);
+  newRange = arr.join();
+  parseRange(oldRange, bitfield, 0, arr);
+  return [ newRange, arr.join() ]
+};
+
+const modifyParamsList = (magnetObj, o, key, value) => {
+  const validate = str => {
+    let validateStr,
+        validateFn;
+
+    if (str !== undefined)
+      validateList = [ str ];
+
+    for (validateStr of validateList)
+      for (validateFn of magnetObj._validators)
+        if (!validateFn(key, validateStr))
+          return 0;
+
+    if (str !== undefined)
+      validateList = [];
+
+    return 1;
+  }
+
   let usedProtocols = [], // for xt
-      protocol,           // for xt/x.pe/tr/ws/as/xs
+      protocol,           // for xt/tr/ws/as/xs
       hash,               // for xt
-      bitfield      = [], // for so
-      arr           = [], // for so
-      l,                  // for x.pe
-      r,                  // for x.pe
-      ip,                 // for x.pe
-      segments,           // for x.pe
-      err,                // for x.pe
-      host,               // for x.pe
-      byte,               // for x.pe
+      keywords      = [], // for kt
+      validateList  = [],
+      oldValue,
+      parser,
+      parsedValue,
       i;
 
   try {
@@ -110,11 +204,9 @@ const set = (validate, o, key, value) => {
       /* BREAK THROUGH */
 
     case "dn":
-      if (!validate(key, value))
-        return;
-
-      o[key] = [ value ];
-      return;
+      validateList.push(value);
+      delete o[key];
+      break;
 
     /* repeatable parameters combinable into single ones */
     case "kt":
@@ -129,32 +221,30 @@ const set = (validate, o, key, value) => {
       /* getting the new keywords */
         .filter(keyword => !o.kt[0].split("+").includes(keyword))
       /* and validating them */
-        .filter(keyword => validate(key, keyword));
+        .filter(keyword => validate(keyword));
 
       /* adding new keywords to the list */
-      o.kt = [
-        o.kt[0].split("+").concat(keywords).join("+").replace(/^\+/, "")
-      ];
-      return;
+      value = o.kt[0].split("+").concat(keywords).join("+").replace(/^\+/, "");
+
+      o.kt = [ value ];
+      return value;
 
     case "so":
       if (!o.so)
         o.so = [ "" ];
 
-      parseRange(o.so[0] + "," + value, bitfield, 1, arr);
-      value = arr.join();
-      parseRange(o.so[0], bitfield, 0, arr);
+      [value, newRange] = parseSO(o.so[0], value);
 
-      if (arr.length && !validate(key, arr.join()))
+      if (newRange.length && !validate(newRange))
         return;
 
       o.so = [ value ];
-      return;
+      return value;
 
     /* repeatable but once per protocol: xt parameter */
     case "xt":
       try {
-        usedProtocols = o.xt.map(uri => parseXT(uri))
+        usedProtocols = o.xt.map(uri => parseXT(uri)[0])
       } catch(err) {
       }
 
@@ -164,77 +254,22 @@ const set = (validate, o, key, value) => {
         return;
       }
 
-      if (!validate(key, [protocol, hash]))
+      if (!validate([protocol, hash]))
         return;
 
       i = usedProtocols.indexOf(protocol);
 
       if (i >= 0) {
         o.xt[i] = value;
-        return;
+        return value;
       }
 
       break;
 
     /* repeatable address parameters */
     case "x.pe":
-      /* checking if port is given - it is neccessary */
-      try {
-        [value, protocol] = getIDNAddress(value, true);
-        host              = /(.*):\d+$/.exec(value)[1];
-      } catch(err) {
-        return;
-      }
-
-      /* IPv4 support */
-      if (/^\d+(\.\d+){3}$/.test(host)) {
-        for (byte of host.split("."))
-          if (byte > 255)
-            return;
-      } else {
-        /* IPv6 support */
-        try {
-          ip          = /^\[([\dA-F:]+)\]$/i.exec(host)[1];
-          [l, r, err] = ip.split("::");
-
-          if (err || /:::/.test(ip))
-            return;
-
-          segments = l.split(":");
-
-          if (r !== undefined) {
-            r = r.split(":");
-
-            segments = segments
-              .concat(new Array(8 - segments.length - r.length).fill(0), r);
-          }
-
-          if (segments.length < 8)
-            return;
-
-          for (i in segments) {
-            if (segments[i] == "")
-              segments[i] = 0;
-
-            if (segments[i].length > 4)
-              return;
-          }
-        } catch(err) {
-          /* hostname */
-          if (!/^[A-Z\d]([A-Z\d-]*[A-Z\d])?(\.[A-Z\d]([A-Z\d-]*[A-Z\d])?)*$/i.test(host))
-            return;
-
-          if (!/[A-Z-]/i.test(host.split(".").pop()))
-            return;
-        }
-      }
-
-      if (!validate(key, value))
-        return;
-
-      if (o[key] && o[key].includes(value))
-        return;
-
+      value = parseXPE(value);
+      validateList.push(value);
       break;
 
     case "tr":
@@ -247,28 +282,45 @@ const set = (validate, o, key, value) => {
         return;
       }
 
-      if (!validate(key, protocol))
-        return;
-
-      if (o[key] && o[key].includes(value))
-        return;
-
+      validateList.push(protocol);
       break;
 
     default:
-      if (!validate(key, value))
+      try {
+        oldValue = o[key][0];
+      } catch(err) {
+      }
+
+      try {
+        for (parser of magnetObj._parsers)
+          if (parsedValue = parser(key, value, validateList, oldValue))
+            break;
+      } catch(err) {
         return;
+      }
+
+      break;
   }
 
-  if (o[key])
-    o[key].push(value)
-  else
+  if (!value || !validate())
+    return;
+
+  if (!o[key]) {
     o[key] = [ value ];
+    return value;
+  }
+
+  if (o[key].includes(value))
+    return value;
+
+  o[key].push(value);
+  return value;
 };
 
 function MagnetURI(data) {
-  this._params   = {};
-  this._validate = () => 1;
+  this._params     = {};
+  this._validators = [() => 1];
+  this._parsers    = [];
 
   if (!data)
     return;
@@ -283,66 +335,119 @@ function MagnetURI(data) {
   }
 }
 
-const paramsList = [
-  "xt", "dn", "xl", "kt", "so", "tr", "xs", "as", "ws", "x.pe"
-];
+const parseInputArgs = (o, key, value, callbackFunc) => {
+  if (!key)
+    return;
 
-Object.assign(MagnetURI.prototype, {
-  get: function(param) {
-    if (!param)
-      return this._params;
+  if (typeof key == "string") {
+    if (typeof value != "string") {
+      if (Array.isArray(value)) {
+        for (value of value)
+          parseInputArgs(o, key, value, callbackFunc);
 
-    return this._params[param];
-  },
-
-  add: function(param, value) {
-    if (!param)
-      return;
-
-    if (typeof param == "string") {
-      if (typeof value != "string") {
-        if (Array.isArray(value)) {
-          for (value of value)
-            this.add(param, value);
-
-          return;
-        }
-
-        if (!value) {
-          param = param.split("&").map(param => param.split("="));
-
-          for ([param, value] of param)
-            this.add(param, value);
-
-          return;
-        }
+        return;
       }
 
-      set(this._validate, this._params, param, value);
-      return;
+      if (!value) {
+        key = key.split("&").map(key => key.split("="));
+
+        for ([key, value] of key) {
+          if (!value)
+            return;
+
+          parseInputArgs(o, key, value, callbackFunc);
+        }
+
+        return;
+      }
     }
 
-    if (Array.isArray(param)) {
-      for ([param, value] of param)
-        this.add(param, value);
+    callbackFunc(o, key, value);
+    return;
+  }
 
-      return;
-    }
+  if (Array.isArray(key)) {
+    for ([key, value] of key)
+      parseInputArgs(o, key, value, callbackFunc);
 
-    if (typeof param != "object")
-      return;
+    return;
+  }
 
-    this.add(Object.entries(param));
+  if (typeof key != "object")
+    return;
+
+  parseInputArgs(o, Object.entries(key), value, callbackFunc);
+};
+
+const pushFunction = (o, prop, fn) => {
+  if (typeof fn == "function")
+    o[prop].push(fn);
+};
+
+Object.assign(MagnetURI.prototype, {
+  get: function(key) {
+    if (!key)
+      return this._keys;
+
+    return this._keys[key];
   },
 
-  set: function(param, value) {
-    // TO DO!
+  add: function(key, value) {
+    parseInputArgs(this, key, value, modifyParamsList);
+  },
+
+  remove: function(key, value) {
+    let arr,
+        i;
+
+    if (!key)
+      return;
+
+    if (Array.isArray(key) && !key.every(x => Array.isArray(x))) {
+      for (key of key) {
+        if (Array.isArray(key))
+          [key, value] = key;
+
+        this.remove(key, value);
+      }
+
+      return;
+    }
+
+    if (typeof key == "string" && !/=/.test(key)) {
+      if (this._params[key])
+        delete this._params[key];
+
+      return;
+    }
+
+    parseInputArgs(this, key, value, (key, value) => {
+      let arr = this._params[key],
+          i;
+
+      if (!arr)
+        return;
+
+      value = modifyParamsList(this, key, value);
+      i     = arr.indexOf(value);
+
+      if (i >= 0)
+        arr.splice(i, 1);
+    });
+  },
+
+  set: function(key, value) {
+    if (typeof key != "string" || !key)
+      return;
+
+    this.remove(key);
+    this.add(key, value);
   },
 
   toString: function() {
     const append = (key, fn) => {
       try {
-        str += `&${key}=` + fn(this._params[key][0]);
+        str += `&${key}=` + fn(this._keys[key][0]);
       } catch(err) {
       }
     };
@@ -353,10 +458,10 @@ Object.assign(MagnetURI.prototype, {
         key,
         value,
         values,
-        params;
+        keys;
 
     try {
-      this._params.xt.forEach(xt => str += "&xt=" + xt);
+      this._keys.xt.forEach(xt => str += "&xt=" + xt);
     } catch(err) {
       throw new Error("Invalid magnet uri.");
     }
@@ -368,21 +473,21 @@ Object.assign(MagnetURI.prototype, {
     append("so", pass);
 
     for (key of ["tr", "xs", "as", "ws"]) {
-      if (!this._params[key])
+      if (!this._keys[key])
         continue;
 
-      for (value of this._params[key])
+      for (value of this._keys[key])
         str += `&${key}=` + encodeURIComponent(value);
     }
 
-    if (this._params["x.pe"])
-      for (value of this._params["x.pe"])
+    if (this._keys["x.pe"])
+      for (value of this._keys["x.pe"])
         str += `&x.pe=` + value;
 
-    params = Object.entries(this._params)
+    keys = Object.entries(this._keys)
       .filter(([key]) => !paramsList.includes(key));
 
-    for ([key, values] of params)
+    for ([key, values] of keys)
       for (value of values)
         str += `&${key}=` + value;
 
@@ -391,5 +496,17 @@ Object.assign(MagnetURI.prototype, {
 
   valueOf: function() {
     return this.toString();
+  },
+
+  addValidator: function(fn) {
+    pushFunction(this, "_validators", fn);
+  },
+
+  addParser: function(fn) {
+    pushFunction(this, "_parsers", fn);
   }
+});
+
+Object.assign(MagnetURI, {
+  parseXT, parseSO, parseXPE
 });
