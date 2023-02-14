@@ -344,7 +344,7 @@ const parseInputArgs = (o, key, value, callbackFunc) => {
       }
     }
 
-    callbackFunc(o, key, value);
+    callbackFunc(o, o._params, key, value);
     return;
   }
 
@@ -387,9 +387,9 @@ function MagnetURI(data) {
 Object.assign(MagnetURI.prototype, {
   get: function(key) {
     if (!key)
-      return this._keys;
+      return this._params;
 
-    return this._keys[key];
+    return this._params[key];
   },
 
   add: function(key, value) {
@@ -414,10 +414,8 @@ Object.assign(MagnetURI.prototype, {
       return;
     }
 
-    if (typeof key == "string" && !/=/.test(key)) {
-      if (this._params[key])
-        delete this._params[key];
-
+    if (typeof key == "string" && !/=/.test(key) && !value) {
+      delete this._params[key];
       return;
     }
 
@@ -447,7 +445,7 @@ Object.assign(MagnetURI.prototype, {
   toString: function() {
     const append = (key, fn) => {
       try {
-        str += `&${key}=` + fn(this._keys[key][0]);
+        str += `&${key}=` + fn(this._params[key][0]);
       } catch(err) {
       }
     };
@@ -461,7 +459,7 @@ Object.assign(MagnetURI.prototype, {
         keys;
 
     try {
-      this._keys.xt.forEach(xt => str += "&xt=" + xt);
+      this._params.xt.forEach(xt => str += "&xt=" + xt);
     } catch(err) {
       throw new Error("Invalid magnet uri.");
     }
@@ -473,18 +471,18 @@ Object.assign(MagnetURI.prototype, {
     append("so", pass);
 
     for (key of ["tr", "xs", "as", "ws"]) {
-      if (!this._keys[key])
+      if (!this._params[key])
         continue;
 
-      for (value of this._keys[key])
+      for (value of this._params[key])
         str += `&${key}=` + encodeURIComponent(value);
     }
 
-    if (this._keys["x.pe"])
-      for (value of this._keys["x.pe"])
+    if (this._params["x.pe"])
+      for (value of this._params["x.pe"])
         str += `&x.pe=` + value;
 
-    keys = Object.entries(this._keys)
+    keys = Object.entries(this._params)
       .filter(([key]) => !paramsList.includes(key));
 
     for ([key, values] of keys)
@@ -511,7 +509,7 @@ Object.assign(MagnetURI, {
   parseXT,
   parseSO,
   parseXPE,
-  _validators: [ () => 1 ],
+  _validators: [],
   _parsers:    [],
 
   addValidator: function(fn) {
