@@ -48,7 +48,8 @@
         segments,
         err,
         host,
-        byte;
+        byte,
+        i;
 
     /* converting to IDN + checking if port is given (it is neccessary) */
     try {
@@ -150,7 +151,7 @@
     parseRange(oldRange + "," + newRange, bitfield, 1, arr);
     newRange = arr.join();
     parseRange(oldRange, bitfield, 0, arr);
-    return [ newRange, arr.join() ]
+    return [ newRange, arr.join() ];
   };
 
   const modifyParamsList = (magnetObj, o, key, value) => {
@@ -170,12 +171,13 @@
         validateList = [];
 
       return 1;
-    }
+    };
 
     let usedProtocols = [], // for xt
         protocol,           // for xt/tr/ws/as/xs
         hash,               // for xt
         keywords      = [], // for kt
+        newRange,           // for so
         validateList  = [],
         oldValue,
         parser,
@@ -247,7 +249,7 @@
       /* repeatable but once per protocol: xt parameter */
       case "xt":
         try {
-          usedProtocols = o.xt.map(uri => parseXT(uri)[0])
+          usedProtocols = o.xt.map(uri => parseXT(uri)[0]);
         } catch(err) {
         }
 
@@ -409,9 +411,6 @@
     },
 
     remove: function(key, value) {
-      let arr,
-          i;
-
       if (!key)
         return;
 
