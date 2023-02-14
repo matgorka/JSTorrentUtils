@@ -317,24 +317,6 @@ const modifyParamsList = (magnetObj, o, key, value) => {
   return value;
 };
 
-function MagnetURI(data) {
-  this._params     = {};
-  this._validators = [() => 1];
-  this._parsers    = [];
-
-  if (!data)
-    return;
-
-  try {
-    if (typeof data == "string")
-      this.add(/^magnet\:\?(.*)/.exec(data)[1]);
-    else
-      this.add(data);
-  } catch(err) {
-    throw new Error("Invalid magnet uri.");
-  }
-}
-
 const parseInputArgs = (o, key, value, callbackFunc) => {
   if (!key)
     return;
@@ -383,6 +365,24 @@ const pushFunction = (o, prop, fn) => {
   if (typeof fn == "function")
     o[prop].push(fn);
 };
+
+function MagnetURI(data) {
+  this._params     = {};
+  this._validators = this.constructor._validators.slice();
+  this._parsers    = this.constructor._parsers.slice();
+
+  if (!data)
+    return;
+
+  try {
+    if (typeof data == "string")
+      this.add(/^magnet\:\?(.*)/.exec(data)[1]);
+    else
+      this.add(data);
+  } catch(err) {
+    throw new Error("Invalid magnet uri.");
+  }
+}
 
 Object.assign(MagnetURI.prototype, {
   get: function(key) {
@@ -508,5 +508,17 @@ Object.assign(MagnetURI.prototype, {
 });
 
 Object.assign(MagnetURI, {
-  parseXT, parseSO, parseXPE
+  parseXT,
+  parseSO,
+  parseXPE,
+  _validators: [ () => 1 ],
+  _parsers:    [],
+
+  addValidator: function(fn) {
+    pushFunction(this, "_validators", fn);
+  },
+
+  addParser: function(fn) {
+    pushFunction(this, "_parsers", fn);
+  }
 });
