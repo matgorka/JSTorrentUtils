@@ -1,7 +1,7 @@
 const parseXT = uri =>
   /^urn:([A-Z\d]+(?::+[A-Z\d]+)*:*):(.*)/i.exec(uri).slice(1);
 
-const parseAddress = (param, addr, isSimpleAddr) => {
+const getIDNAddress = (addr, hasNoProtocol) => {
   let protocol,
       rest,
       urlData,
@@ -9,10 +9,10 @@ const parseAddress = (param, addr, isSimpleAddr) => {
       sliceI     = 7,
       interAddr;      /* internationalized address */
 
-  if (isSimpleAddr)
+  if (hasNoProtocol)
     addr = "http://" + addr;
 
-  [protocol, rest] = /^(.*?:\/*)(.*)/.exec(addr).slice(1);
+  [protocol, rest] = /^(\w+:\/*)(.*)/.exec(addr).slice(1);
   urlData          = new URL("http://" + rest);
   urlData2         = new URL("https://" + rest);
 
@@ -24,7 +24,7 @@ const parseAddress = (param, addr, isSimpleAddr) => {
   if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
     throw new Error();
 
-  if (isSimpleAddr)
+  if (hasNoProtocol)
     protocol = "";
 
   interAddr = protocol + urlData.href.slice(sliceI);
@@ -180,7 +180,7 @@ const set = (validate, o, key, value) => {
     case "x.pe":
       /* checking if port is given - it is neccessary */
       try {
-        [value, protocol] = parseAddress(key, value, true);
+        [value, protocol] = getIDNAddress(value, true);
         host              = /(.*):\d+$/.exec(value)[1];
       } catch(err) {
         return;
@@ -242,7 +242,7 @@ const set = (validate, o, key, value) => {
     case "as":
     case "xs":
       try {
-        [value, protocol] = parseAddress(key, value);
+        [value, protocol] = getIDNAddress(value);
       } catch(err) {
         return;
       }
