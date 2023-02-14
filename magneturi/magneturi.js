@@ -298,6 +298,14 @@
           for (parser of magnetObj._parsers)
             if (parsedValue = parser(key, value, validateList, oldValue))
               break;
+
+          if (parsedValue) {
+            if (typeof parsedValue != "string")
+              throw new TypeError("Custom parser error: string was expected");
+
+            value = parsedValue;
+          } else if (!magnetObj.isAllowingUnknownParams)
+            return;
         } catch(err) {
           return;
         }
@@ -370,9 +378,10 @@
   };
 
   function MagnetURI(data) {
-    this._params     = {};
-    this._validators = this.constructor._validators.slice();
-    this._parsers    = this.constructor._parsers.slice();
+    this._params                 = {};
+    this._validators             = this.constructor._validators.slice();
+    this._parsers                = this.constructor._parsers.slice();
+    this.isAllowingUnknownParams = this.constructor.isAllowingUnknownParams;
 
     if (!data)
       return;
@@ -512,8 +521,9 @@
     parseXT,
     parseSO,
     parseXPE,
-    _validators: [],
-    _parsers:    [],
+    _validators:             [],
+    _parsers:                [],
+    isAllowingUnknownParams: true,
 
     addValidator: function(fn) {
       pushFunction(this, "_validators", fn);
