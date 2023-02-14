@@ -419,14 +419,14 @@ Object.assign(MagnetURI.prototype, {
       return;
     }
 
-    parseInputArgs(this, key, value, (key, value) => {
-      let arr = this._params[key],
+    parseInputArgs(this, key, value, (magnetObj, o, key, value) => {
+      let arr = o[key],
           i;
 
       if (!arr)
         return;
 
-      value = modifyParamsList(this, key, value);
+      value = modifyParamsList(magnetObj, o, key, value);
       i     = arr.indexOf(value);
 
       if (i >= 0)
