@@ -7,7 +7,7 @@ const getIDNAddress = (addr, hasNoProtocol) => {
       urlData,
       urlData2,
       sliceI     = 7,
-      interAddr;      /* internationalized address */
+      idnAddr;
 
   if (hasNoProtocol)
     addr = "http://" + addr;
@@ -27,12 +27,12 @@ const getIDNAddress = (addr, hasNoProtocol) => {
   if (hasNoProtocol)
     protocol = "";
 
-  interAddr = protocol + urlData.href.slice(sliceI);
+  idnAddr = protocol + urlData.href.slice(sliceI);
 
   if (!addr.endsWith("/"))
-    interAddr = interAddr.replace(/\/$/, "");
+    idnAddr = idnAddr.replace(/\/$/, "");
 
-  return [ interAddr, protocol ];
+  return [ idnAddr, protocol ];
 };
 
 const parseRange = (rangeStr, bitfield, booleanValue, arr) => {
