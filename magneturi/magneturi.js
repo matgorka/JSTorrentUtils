@@ -182,6 +182,7 @@
         oldValue,
         parser,
         parsedValue,
+        isRepeatable  = 1,
         i;
 
     try {
@@ -208,7 +209,7 @@
 
       case "dn":
         validateList.push(value);
-        delete o[key];
+        isRepeatable = 0;
         break;
 
       /* repeatable parameters combinable into single ones */
@@ -300,23 +301,31 @@
           for (parser of magnetObj._parsers)
             if (parsedValue = parser(key, value, validateList, oldValue))
               break;
-
-          if (parsedValue) {
-            if (typeof parsedValue != "string")
-              throw new TypeError("Custom parser error: string was expected");
-
-            value = parsedValue;
-          } else if (!magnetObj.isAllowingUnknownParams)
-            return;
         } catch(err) {
           return;
         }
 
+        if (parsedValue) {
+          if (typeof parsedValue != "string")
+            throw new TypeError("Custom parser error: string was expected");
+
+          value = parsedValue;
+        }
+
+        if (!Array.isArray(value)) {
+          isRepeatable = 0;
+          break;
+        }
+
+        value = value[0];
         break;
     }
 
     if (!value || !validate())
       return;
+
+    if (!isRepeatable)
+      delete o[key];
 
     if (!o[key]) {
       o[key] = [ value ];
@@ -380,10 +389,12 @@
   };
 
   function MagnetURI(data) {
-    this._params                 = {};
-    this._validators             = this.constructor._validators.slice();
-    this._parsers                = this.constructor._parsers.slice();
-    this.isAllowingUnknownParams = this.constructor.isAllowingUnknownParams;
+    if (!new.target)
+      return new MagnetURI(data);
+
+    this._params     = {};
+    this._validators = this.constructor._validators.slice();
+    this._parsers    = this.constructor._parsers.slice();
 
     if (!data)
       return;
@@ -522,7 +533,6 @@
     parseXPE,
     _validators:             [],
     _parsers:                [],
-    isAllowingUnknownParams: true,
 
     addValidator: function(fn) {
       pushFunction(this, "_validators", fn);
