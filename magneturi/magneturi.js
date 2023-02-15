@@ -353,11 +353,11 @@
           return;
         }
 
-        if (!value) {
+        if (!value && value != 0) {
           key = key.split("&").map(key => key.split("="));
 
           for ([key, value] of key) {
-            if (!value)
+            if (!value && value != 0)
               return;
 
             parseInputArgs(o, key, value, callbackFunc);
