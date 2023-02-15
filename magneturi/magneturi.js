@@ -490,17 +490,13 @@
       append("kt", pass);
       append("so", pass);
 
-      for (key of ["tr", "xs", "as", "ws"]) {
+      for (key of ["tr", "xs", "as", "ws", "x.pe"]) {
         if (!this._params[key])
           continue;
 
         for (value of this._params[key])
           str += `&${key}=` + encodeURIComponent(value);
       }
-
-      if (this._params["x.pe"])
-        for (value of this._params["x.pe"])
-          str += `&x.pe=` + value;
 
       keys = Object.entries(this._params)
         .filter(([key]) => !paramsList.includes(key));
@@ -513,6 +509,10 @@
     }
 
     valueOf() {
+      return this.toString();
+    }
+
+    toJSON() {
       return this.toString();
     }
 
