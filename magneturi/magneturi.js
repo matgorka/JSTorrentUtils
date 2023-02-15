@@ -389,40 +389,37 @@
       o[prop].push(fn);
   };
 
-  function MagnetURI(data) {
-    if (!new.target)
-      return new MagnetURI(data);
+  class MagnetURI {
+    constructor(data) {
+      this._params     = {};
+      this._validators = this.constructor._validators.slice();
+      this._parsers    = this.constructor._parsers.slice();
 
-    this._params     = {};
-    this._validators = this.constructor._validators.slice();
-    this._parsers    = this.constructor._parsers.slice();
+      if (!data)
+        return;
 
-    if (!data)
-      return;
-
-    try {
-      if (typeof data == "string")
-        this.add(/^magnet\:\?(.*)/.exec(data)[1]);
-      else
-        this.add(data);
-    } catch(err) {
-      throw new Error("Invalid magnet uri.");
+      try {
+        if (typeof data == "string")
+          this.add(/^magnet\:\?(.*)/.exec(data)[1]);
+        else
+          this.add(data);
+      } catch(err) {
+        throw new Error("Invalid magnet uri.");
+      }
     }
-  }
 
-  Object.assign(MagnetURI.prototype, {
-    get: function(key) {
+    get(key) {
       if (!key)
         return this._params;
 
       return this._params[key];
-    },
+    }
 
-    add: function(key, value) {
+    add(key, value) {
       parseInputArgs(this, key, value, modifyParamsList);
-    },
+    }
 
-    remove: function(key, value) {
+    remove(key, value) {
       if (!key)
         return;
 
@@ -455,17 +452,17 @@
         if (i >= 0)
           arr.splice(i, 1);
       });
-    },
+    }
 
-    set: function(key, value) {
+    set(key, value) {
       if (typeof key != "string" || !key)
         return;
 
       this.remove(key);
       this.add(key, value);
-    },
+    }
 
-    toString: function() {
+    toString() {
       const append = (key, fn) => {
         try {
           str += `&${key}=` + fn(this._params[key][0]);
@@ -513,20 +510,20 @@
           str += `&${key}=` + value;
 
       return str;
-    },
+    }
 
-    valueOf: function() {
+    valueOf() {
       return this.toString();
-    },
+    }
 
-    addValidator: function(fn) {
+    addValidator(fn) {
       pushFunction(this, "_validators", fn);
-    },
+    }
 
-    addParser: function(fn) {
+    addParser(fn) {
       pushFunction(this, "_parsers", fn);
     }
-  });
+  }
 
   Object.assign(MagnetURI, {
     parseXT,
