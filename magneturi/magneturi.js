@@ -310,14 +310,15 @@
             throw new TypeError("Custom parser error: string was expected");
 
           value = parsedValue;
+
+          if (!Array.isArray(value)) {
+            isRepeatable = 0;
+            break;
+          }
+
+          value = value[0];
         }
 
-        if (!Array.isArray(value)) {
-          isRepeatable = 0;
-          break;
-        }
-
-        value = value[0];
         break;
     }
 
