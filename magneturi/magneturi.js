@@ -246,9 +246,9 @@
         return value;
 
       /* repeatable but once per protocol: xt parameter */
-      case "xt":
+      case /^xt(\.\d+)?$/.test(key) ? key : "":
         try {
-          usedProtocols = o.xt.map(uri => parseXT(uri)[0]);
+          usedProtocols = o[key].map(uri => parseXT(uri)[0]);
         } catch(err) {
         }
 
@@ -264,11 +264,15 @@
         i = usedProtocols.indexOf(protocol);
 
         if (i >= 0) {
-          o.xt[i] = value;
+          o[key][i] = value;
           return value;
         }
 
         break;
+
+      /* check for invalid xt parameter */
+      case /^xt\..*/.test(key) ? key : "":
+        return;
 
       /* repeatable address parameters */
       case "x.pe":
