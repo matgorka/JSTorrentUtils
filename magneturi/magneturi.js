@@ -10,7 +10,6 @@
     let protocol,
         rest,
         urlData,
-        urlData2,
         sliceI     = 7,
         idnAddr;
 
@@ -19,10 +18,9 @@
 
     [protocol, rest] = /^(\w+:\/*)(.*)/.exec(addr).slice(1);
     urlData          = new URL("http://" + rest);
-    urlData2         = new URL("https://" + rest);
 
-    if (!urlData.port && urlData2.port) {
-      urlData = urlData2;
+    if (!urlData.port) {
+      urlData = new URL("https://" + rest);
       sliceI  = 8;
     }
 
