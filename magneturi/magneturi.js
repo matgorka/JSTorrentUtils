@@ -472,7 +472,8 @@
         }
       };
 
-      const pass = value => value;
+      const pass = value => value,
+            params = this._params;
 
       let str = "",
           key,
@@ -481,7 +482,7 @@
           keys;
 
       try {
-        this._params.xt.forEach(xt => str += "&xt=" + xt);
+        params.xt.forEach(xt => str += "&xt=" + xt);
       } catch(err) {
         throw new Error("Invalid magnet uri.");
       }
@@ -493,14 +494,14 @@
       append("so", pass);
 
       for (key of ["tr", "xs", "as", "ws", "x.pe"]) {
-        if (!this._params[key])
+        if (!params[key])
           continue;
 
-        for (value of this._params[key])
+        for (value of params[key])
           str += `&${key}=` + encodeURIComponent(value);
       }
 
-      keys = Object.entries(this._params)
+      keys = Object.entries(params)
         .filter(([key]) => !paramsList.includes(key));
 
       for ([key, values] of keys)
