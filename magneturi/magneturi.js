@@ -226,7 +226,7 @@
         break;
 
       case "s":
-        if (/[^A-F\d]/i.test(value));
+        if (/[^A-F\d]/i.test(value))
           return;
 
         validateList.push(value);
@@ -534,11 +534,18 @@
         for (i in params) {
           [paramKey, values] = params[i];
 
-          if (ruleKey.test(paramKey))
+          if (ruleKey.test(paramKey)) {
             for (value of values)
               str += `&${paramKey}=` + fn(value);
+
+            params.splice(i, 1);
+          }
         }
       }
+
+      for ([paramKey, values] of params)
+        for (value of values)
+          str += `&${paramKey}=` + value;
 
       return "magnet:?" + str.slice(1);
     }
