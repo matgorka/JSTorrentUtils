@@ -1,6 +1,18 @@
 (g => {
-  const paramsList = [
-    "xt", "dn", "xl", "kt", "so", "tr", "xs", "as", "ws", "x.pe"
+  const passValue = value => value;
+
+  const rules = [
+    [/^xt$/, passValue],
+    [/^xt\.\d+$/, passValue],
+    [/^dn$/, encodeURIComponent],
+    [/^xl$/, passValue],
+    [/^kt$/, passValue],
+    [/^so$/, passValue],
+    [/^tr$/, encodeURIComponent],
+    [/^xs$/, encodeURIComponent],
+    [/^as$/, encodeURIComponent],
+    [/^ws$/, encodeURIComponent],
+    [/^x.pe$/, encodeURIComponent],
   ];
 
   const parseXT = uri =>
@@ -465,61 +477,40 @@
     }
 
     toString() {
-      const append = (key, fn) => {
-        try {
-          str += `&${key}=` + fn(this._params[key][0]);
-        } catch(err) {
-        }
-      };
-
-      const pass = value => value,
-            params = this._params;
-
-      let str = "",
-          key,
-          value,
+      let str            = "",
+          params,
+          indexedXT,
+          indexedXTKeys,
+          paramKey,
           values,
-          keys,
-          indexedXT;
+          value,
+          ruleKey,
+          fn,
+          i;
 
-      try {
-        params.xt.forEach(xt => str += "&xt=" + xt);
-      } catch(err) {
-        throw new Error("Invalid magnet uri.");
-      }
-
-      indexedXT = Object.entries(params)
-        .filter(([key]) => /^xt\.\d+$/.test(key))
+      params    = Object.entries(this._params);
+      indexedXT = params.filter(([key]) => /^xt\.\d+$/.test(key))
         .map(([key, value]) => [ key.split(".")[1], value])
         .sort((a, b) => a[0] - b[0])
         .map(([key, value]) => [ "xt." + key, value]);
 
-      for ([key, values] of indexedXT)
-        for (value of values)
-          str += `&${key}=` + value;
+      indexedXTKeys = indexedXT.map(([key]) => key);
 
-      str = "magnet:?" + str.slice(1);
-      append("dn", encodeURIComponent);
-      append("xl", pass);
-      append("kt", pass);
-      append("so", pass);
+      params = params
+        .filter(([key]) => !indexedXTKeys.includes(key))
+        .concat(indexedXT);
 
-      for (key of ["tr", "xs", "as", "ws", "x.pe"]) {
-        if (!params[key])
-          continue;
+      for ([ruleKey, fn] of rules) {
+        for (i in params) {
+          [paramKey, values] = params[i];
 
-        for (value of params[key])
-          str += `&${key}=` + encodeURIComponent(value);
+          if (ruleKey.test(paramKey))
+            for (value of values)
+              str += `&${paramKey}=` + fn(value);
+        }
       }
 
-      keys = Object.entries(params)
-        .filter(([key]) => !paramsList.includes(key) || !key.startsWith("xt."));
-
-      for ([key, values] of keys)
-        for (value of values)
-          str += `&${key}=` + value;
-
-      return str;
+      return "magnet:?" + str.slice(1);
     }
 
     valueOf() {
