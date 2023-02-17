@@ -488,7 +488,7 @@
         throw new Error("Invalid magnet uri.");
       }
 
-      indexedXT = Object.entries(this._params)
+      indexedXT = Object.entries(params)
         .filter(([key]) => /^xt\.\d+$/.test(key))
         .map(([key, value]) => [ key.split(".")[1], value])
         .sort((a, b) => a[0] - b[0])
