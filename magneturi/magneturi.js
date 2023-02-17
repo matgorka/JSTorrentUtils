@@ -3,7 +3,7 @@
   const encodeXS  = value =>
     value.startsWith("urn:") ? value : encodeURIComponent(value);
 
-  const rules = [
+  const rulesList = [
     [/^xt$/, passValue],
     [/^xt\.\d+$/, passValue],
     [/^dn$/, encodeURIComponent],
@@ -14,8 +14,7 @@
     [/^xs$/, encodeXS],
     [/^as$/, encodeURIComponent],
     [/^ws$/, encodeURIComponent],
-    [/^x.pe$/, encodeURIComponent],
-    [/^s$/, passValue]
+    [/^x.pe$/, encodeURIComponent]
   ];
 
   const parseXT = uri =>
@@ -521,7 +520,9 @@
 
     toString() {
       let str            = "",
+          param,
           params,
+          rules,
           indexedXT,
           indexedXTKeys,
           paramKey,
@@ -529,9 +530,25 @@
           value,
           ruleKey,
           fn,
-          i;
+          isMutable = false,
+          i,
+          j;
 
-      params    = Object.entries(this._params);
+      rules     = rulesList.slice();
+      params    = Object.assign({}, this._params);
+
+      if (params.xs) {
+        i = params.xs.findIndex(value => value.startsWith("urn:"));
+
+        if (i >= 0) {
+          /* hardcoded part */
+          rules.splice(2, 0, rules.splice(7, 1)[0]);
+          params.xs.splice(0, 0, params.xs.splice(i, 1)[0]);
+          isMutable = true;
+        }
+      }
+
+      params    = Object.entries(params);
       indexedXT = params.filter(([key]) => /^xt\.\d+$/.test(key))
         .map(([key, value]) => [ key.split(".")[1], value])
         .sort((a, b) => a[0] - b[0])
@@ -548,8 +565,9 @@
           [paramKey, values] = params[i];
 
           if (ruleKey.test(paramKey)) {
-            for (value of values)
-              str += `&${paramKey}=` + fn(value);
+            if (!(isMutable && /^xt(\.\d+)?$/.test(paramKey)))
+              for (value of values)
+                str += `&${paramKey}=` + fn(value);
 
             params.splice(i, 1);
           }
@@ -559,6 +577,19 @@
       for ([paramKey, values] of params)
         for (value of values)
           str += `&${paramKey}=` + value;
+
+      if (isMutable) {
+        param = /(&s=[A-F\d]+)&?/i.exec(str);
+
+        try {
+          i     = param.index;
+          param = param[1];
+          str   = str.substr(0, i) + str.substr(i + param.length);
+          i     = /^&xs=.*?&/.exec(str)[0].length - 1;
+          str   = str.substr(0, i) + param + str.substr(i);
+        } catch(err) {
+        }
+      }
 
       return "magnet:?" + str.slice(1);
     }
