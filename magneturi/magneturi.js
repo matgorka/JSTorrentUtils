@@ -506,6 +506,19 @@
       this.add(key, value);
     }
 
+    addKeywords(keywords) {
+      if (!Array.isArray(keywords))
+        keywords = [ keywords ];
+
+      this.add("kt",
+        keywords
+          .filter(keyword => typeof keyword == "string")
+          .map(keyword => keyword.split(/\s+/))
+          .flat()
+          .map(keyword => encodeURIComponent(keyword))
+          .join("+"));
+    }
+
     toString() {
       let str            = "",
           params,
