@@ -40,7 +40,7 @@
     }
 
     if (["udp://", "tcp://"].includes(protocol) && urlData.port === "")
-      throw new Error();
+      throw Error();
 
     if (hasNoProtocol)
       protocol = "";
@@ -351,7 +351,7 @@
 
         if (parsedValue) {
           if (typeof parsedValue != "string")
-            throw new TypeError("Custom parser error: string was expected");
+            throw TypeError("Custom parser error: string was expected");
 
           value = parsedValue;
 
@@ -448,7 +448,7 @@
         else
           this.add(data);
       } catch(err) {
-        throw new Error("Invalid magnet uri.");
+        throw Error("Invalid magnet uri.");
       }
     }
 
