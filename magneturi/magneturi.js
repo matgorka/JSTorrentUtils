@@ -1,5 +1,7 @@
 (g => {
   const passValue = value => value;
+  const encodeXS  = value =>
+    value.startsWith("urn:") ? value : encodeURIComponent(value);
 
   const rules = [
     [/^xt$/, passValue],
@@ -9,10 +11,11 @@
     [/^kt$/, passValue],
     [/^so$/, passValue],
     [/^tr$/, encodeURIComponent],
-    [/^xs$/, encodeURIComponent],
+    [/^xs$/, encodeXS],
     [/^as$/, encodeURIComponent],
     [/^ws$/, encodeURIComponent],
     [/^x.pe$/, encodeURIComponent],
+    [/^s$/, passValue]
   ];
 
   const parseXT = uri =>
@@ -63,8 +66,8 @@
 
     /* converting to IDN + checking if port is given (it is neccessary) */
     try {
-      [value, protocol] = getIDNAddress(value, true);
-      host              = /(.*):\d+$/.exec(value)[1];
+      [value] = getIDNAddress(value, true);
+      host    = /(.*):\d+$/.exec(value)[1];
     } catch(err) {
       return;
     }
@@ -222,6 +225,14 @@
         isRepeatable = 0;
         break;
 
+      case "s":
+        if (/[^A-F\d]/i.test(value));
+          return;
+
+        validateList.push(value);
+        isRepeatable = 0;
+        break;
+
       /* repeatable parameters combinable into single ones */
       case "kt":
         if (!o.kt)
@@ -292,17 +303,36 @@
         validateList.push(value);
         break;
 
+      case "xs":
+        try {
+          [protocol, hash] = parseXT(value);
+
+          if (protocol != "btpk" || !validate([protocol, hash]))
+            return;
+
+          if (o.xs) {
+            i = o.xs.indexOf(/^urn:/);
+
+            if (i >= 0) {
+              o.xs[i] = value;
+              return value;
+            }
+          }
+
+          break;
+        } catch(err) {
+        }
+
       case "tr":
       case "ws":
       case "as":
-      case "xs":
         try {
           [value, protocol] = getIDNAddress(value);
         } catch(err) {
           return;
         }
 
-        validateList.push(protocol);
+        validateList.push([protocol, value]);
         break;
 
       default:
