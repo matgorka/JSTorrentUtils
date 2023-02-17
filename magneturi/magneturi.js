@@ -479,13 +479,24 @@
           key,
           value,
           values,
-          keys;
+          keys,
+          indexedXT;
 
       try {
         params.xt.forEach(xt => str += "&xt=" + xt);
       } catch(err) {
         throw new Error("Invalid magnet uri.");
       }
+
+      indexedXT = Object.entries(this._params)
+        .filter(([key]) => /^xt\.\d+$/.test(key))
+        .map(([key, value]) => [ key.split(".")[1], value])
+        .sort((a, b) => a[0] - b[0])
+        .map(([key, value]) => [ "xt." + key, value]);
+
+      for ([key, values] of indexedXT)
+        for (value of values)
+          str += `&${key}=` + value;
 
       str = "magnet:?" + str.slice(1);
       append("dn", encodeURIComponent);
@@ -502,7 +513,7 @@
       }
 
       keys = Object.entries(params)
-        .filter(([key]) => !paramsList.includes(key));
+        .filter(([key]) => !paramsList.includes(key) || !key.startsWith("xt."));
 
       for ([key, values] of keys)
         for (value of values)
